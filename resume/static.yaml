@@ -1,0 +1,14 @@
+name: Jane Doe
+email: jane@example.com
+phone: +1-555-000-0000
+location: San Francisco, CA
+linkedin: https://linkedin.com/in/janedoe
+github: https://github.com/janedoe
+
+education:
+  - degree: B.S. Computer Science
+    school: UC Berkeley
+    year: 2018
+
+certifications:
+  - AWS Solutions Architect (2022)

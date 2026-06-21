@@ -1,0 +1,26 @@
+experiences:
+  - id: exp-001
+    title: Senior Software Engineer
+    company: Acme Corp
+    start: "2020-01"
+    end: "2024-01"
+    tags: [python, kafka, distributed-systems, backend, sql]
+    bullets:
+      - Reduced P99 latency by 40%
+      - Led migration to microservices
+
+  - id: exp-002
+    title: Software Engineer
+    company: Beta Co
+    start: "2016-07"
+    end: "2019-12"
+    tags: [python, django, rest, postgresql]
+    bullets:
+      - Built REST APIs for 100k DAU
+
+projects:
+  - id: proj-001
+    title: Streaming Pipeline
+    tags: [kafka, spark, python, ml]
+    bullets:
+      - Built pipeline processing 1M events/sec

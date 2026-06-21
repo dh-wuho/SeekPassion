@@ -1,0 +1,37 @@
+experiences:
+  - id: exp-001
+    title: Senior Software Engineer
+    company: Acme Corp
+    start: "2021-03"
+    end: "2024-01"
+    tags: [python, distributed-systems, kafka, latency, infra, backend]
+    bullets:
+      - Reduced P99 latency by 40% by redesigning cache invalidation strategy
+      - Led migration of monolith to microservices serving 50M req/day
+      - Mentored 3 junior engineers; conducted weekly design reviews
+
+  - id: exp-002
+    title: Software Engineer
+    company: Beta Inc
+    start: "2018-07"
+    end: "2021-02"
+    tags: [python, sql, postgresql, rest-api, django, backend]
+    bullets:
+      - Built REST APIs consumed by 200k daily active users
+      - Migrated legacy MySQL schema to PostgreSQL with zero downtime
+      - Reduced CI pipeline runtime by 60% through parallelization
+
+projects:
+  - id: proj-001
+    title: Real-time Analytics Pipeline
+    tags: [kafka, python, ml, latency, streaming, spark]
+    bullets:
+      - Built end-to-end streaming pipeline processing 1M events/sec with sub-100ms lag
+      - Deployed ML anomaly detection model reducing false alerts by 30%
+
+  - id: proj-002
+    title: Open Source CLI Tool
+    tags: [python, cli, open-source, developer-tools]
+    bullets:
+      - Published Python CLI tool with 2k GitHub stars
+      - Implemented plugin system enabling community extensions

@@ -1,0 +1,28 @@
+companies:
+  - name: Anthropic
+    url: https://boards.greenhouse.io/anthropic
+  - name: Notion
+    url: https://jobs.lever.co/notion
+
+discovery:
+  max_job_age_weeks: 4
+  domains: [engineering]
+  title_exclude: []
+  min_years_required: 4
+
+resume:
+  static_file: resume/static.yaml
+  pool_file: resume/pool.yaml
+
+fit_weight: 0.6
+success_weight: 0.4
+min_fit_score: 40
+daily_application_limit: 50
+snippet_select_n: 5
+
+# llm:
+#   provider: anthropic
+#   model: claude-sonnet-4-6
+#   api_key: sk-...
+
+notification_email: user@example.com
