@@ -4,9 +4,9 @@
 
 ### 1.1 Vision
 
-AI Career Agent is an AI-powered career assistant that helps users discover, prepare, and submit high-quality job applications with minimal manual effort.
+Seek Passion is an AI-powered career assistant that helps users discover, prepare, and submit high-quality job applications with minimal manual effort.
 
-Unlike traditional job boards or mass auto-apply tools, AI Career Agent focuses on **quality over quantity**. The platform continuously monitors jobs from companies the user is interested in, matches those jobs against the user's career profile, generates customized application materials, and assists with browser-based applications while always allowing the user to review before submission.
+Unlike traditional job boards or mass auto-apply tools, Seek Passion focuses on **quality over quantity**. The platform continuously monitors jobs from companies the user is interested in, matches those jobs against the user's career profile, generates customized application materials, and assists with browser-based applications while always allowing the user to review before submission.
 
 The long-term vision is to build an intelligent career assistant that understands a user's professional experience as well as they do and can act on their behalf safely and efficiently.
 
@@ -37,7 +37,7 @@ Existing solutions usually solve only one piece of the workflow:
 
 Users still need to combine multiple tools and manually complete the end-to-end application process.
 
-AI Career Agent aims to unify the complete workflow into a single platform.
+Seek Passion aims to unify the complete workflow into a single platform.
 
 ---
 
@@ -257,7 +257,7 @@ Steps:
 3. Import an existing resume.
 4. Build the Experience Library.
 5. Configure AI provider.
-6. Add target companies.
+6. Subscribe to target companies from the catalog.
 
 This setup should be completed only once.
 
@@ -382,23 +382,26 @@ The Dashboard is the entry point after login and provides a high-level overview 
 
 ### 5.2 Companies
 
-The Companies page manages all monitored companies.
+The Companies page lets a user browse the platform-curated company catalog and
+manage which companies they follow. The catalog itself (which companies get
+scanned) is admin-managed; users subscribe rather than add arbitrary companies.
 
 #### Features
 
-* Add company
-* Remove company
-* Enable/Disable monitoring
-* Configure monitoring frequency
+* Browse the company catalog
+* Subscribe / unsubscribe to a company
 * View crawl history
-* Trigger manual refresh
+* Trigger manual refresh (of a catalog company the user follows)
 
-Each company stores:
+The catalog is scanned on a fixed schedule every 4 hours; per-user monitoring
+frequency is not configurable.
+
+Each catalog company stores:
 
 * Company Name
 * Career URL
 * ATS Type (optional)
-* Monitoring Status
+* Monitoring Status (admin toggle)
 * Last Crawl Time
 
 ---
@@ -588,7 +591,8 @@ Includes:
 
 ### Company Monitoring
 
-The platform continuously monitors user-selected companies.
+The platform scans the curated company catalog on a fixed schedule every 4 hours
+and surfaces jobs to each user based on their subscriptions.
 
 Responsibilities:
 
@@ -852,7 +856,7 @@ When the harness encounters a CAPTCHA or other anti-bot challenge, it must pause
 
 ### Performance
 
-* Detect newly posted jobs within 10 minutes
+* Detect newly posted jobs within one scan cycle (catalog scanned every 4 hours, on the 00:00 UTC boundary — ~4h worst-case freshness)
 * Resume generation under 20 seconds
 * Browser startup under 10 seconds
 * Application preparation under 2 minutes
@@ -1001,4 +1005,4 @@ The following features are intentionally excluded from the first release:
 
 ## Product Summary
 
-AI Career Agent is designed to become a user's long-term career assistant rather than a simple resume builder or auto-apply tool. The platform centralizes career knowledge, continuously discovers relevant opportunities, generates truthful and personalized application materials, and automates repetitive browser interactions while ensuring that the user remains in control of every submitted application.
+Seek Passion is designed to become a user's long-term career assistant rather than a simple resume builder or auto-apply tool. The platform centralizes career knowledge, continuously discovers relevant opportunities, generates truthful and personalized application materials, and automates repetitive browser interactions while ensuring that the user remains in control of every submitted application.

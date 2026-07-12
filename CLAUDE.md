@@ -8,6 +8,12 @@ This task involves multi-step reasoning. Think carefully through the problem bef
 
 Provide concise, focused responses. Skip non-essential context, and keep examples minimal.
 
+Practice test-driven development: write the test before the implementation. Every new
+implementation must ship with integration tests covering it — not just unit tests. Before
+considering any change done, run the full test suite and confirm both existing and newly added
+tests pass; a change that breaks an existing test is not complete until the break is fixed or the
+test is deliberately and explicitly updated.
+
 ## Project status
 
 This repository currently contains product and design documentation only — no code has been
@@ -16,6 +22,11 @@ design (architecture, tech stack, data model, and tooling). Treat both as living
 them before implementing a feature, and update them when a design decision changes.
 
 ## Architecture (planned, per docs/DESIGN.md)
+
+Seek Passion is an AI-powered career assistant that discovers relevant jobs from companies a user
+tracks, generates truthful tailored resumes/answers grounded in the user's Experience Library, and
+drives browser-based applications — always pausing for human review before submission.
+
 
 Monorepo layout:
 - `apps/web` — Next.js (TypeScript) frontend

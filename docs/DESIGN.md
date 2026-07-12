@@ -1,6 +1,6 @@
 # Seek Passion — Design
 
-This document describes the technical design for AI Career Agent, based on the
+This document describes the technical design for Seek Passion, based on the
 requirements in [PRD.md](./PRD.md). It covers architecture, tech stack, data
 model, and the design of the Job Application Harness.
 
@@ -77,9 +77,18 @@ Stateless FastAPI service. Owns:
 - Read APIs for browser session status, logs, screenshots
 
 ### 3.3 Company Monitor Workers
-Scheduled Celery tasks (Celery Beat) that poll each monitored company per
-its configured frequency, normalize job postings, deduplicate against
-existing records, and enqueue a Job Matching task for new/changed jobs.
+A single Celery Beat schedule scans the **platform-curated company catalog
+every 4 hours (00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC)** — a 4-hour
+cadence spreads coverage across business hours in every timezone so postings
+are picked up within ~4h wherever they originate, while staying far kinder to
+ATS APIs than aggressive polling. Each
+company is a shared, global entity scanned **once per run regardless of how
+many users subscribe to it**; the scan normalizes postings, deduplicates
+against existing jobs, then enqueues a per-user Job Matching task for each
+subscriber (§4 `Subscription`). Users cannot poll arbitrary companies — the
+catalog is admin-managed — but any subscriber can trigger a manual refresh of
+a catalog company on demand between scheduled runs (PRD §5.2).
+
 Distinguishes two ingestion strategies:
 - **ATS API adapters** (preferred, stable) — **MVP ships Greenhouse and
   Lever first**: both expose public job-board read APIs (no scraping needed
@@ -103,6 +112,24 @@ input/output contract:
 All generation tasks follow the retrieval-first pattern from PRD §2.3:
 retrieve from the Experience Library before calling the LLM, and pass only
 verified snippets as grounding context — never ask the LLM to invent content.
+
+**Retrieval strategy (MVP): pass the whole Experience Library into context,
+no embeddings or vector store.** The primary persona (PRD §3.1) realistically
+has a few dozen snippets — roughly 3k–9k tokens — which fits current context
+windows with room to spare, so full-library grounding is both simpler and
+more accurate than top-K similarity (no retriever recall miss). It also keeps
+BYOM clean: no dependency on any provider's embedding model. `retrieve()` is
+a defined function boundary — at MVP it returns everything; a V2 vector-search
+implementation returns top-K behind the same interface, with no other change.
+Revisit when a user's library outgrows the context budget or when the per-call
+token cost/latency threatens the PRD §9 "resume generation under 20s" target.
+
+**Truthfulness enforcement.** "Never hallucinate" (PRD §2.2) is enforced, not
+just declared: after generation, a validation step checks that factual claims
+in the output (companies, titles, metrics, technologies) trace back to the
+source snippets passed in. Content that fails validation is flagged to the
+user rather than silently surfaced. This is the concrete mechanism behind the
+principle — without it, "never hallucinate" is only aspirational.
 
 ### 3.5 Job Application Harness
 See §5 below — this is the most novel and highest-risk component.
@@ -148,16 +175,27 @@ the migration.
 | linkedin_url / github_url / portfolio_url | TEXT | |
 
 ### Company
+Global, platform-curated catalog entity — **not per-user**. Users relate to
+companies only through `Subscription`.
 | Column | Type | Notes |
 |---|---|---|
 | id | UUID (PK) | |
-| user_id | UUID (FK → User) | company list is per-user |
 | name | TEXT | |
 | career_url | TEXT | |
 | ats_type | TEXT NULLABLE | greenhouse / lever / workday / custom |
-| monitoring_status | ENUM(active, paused) | |
-| monitoring_frequency_minutes | INTEGER | |
+| monitoring_status | ENUM(active, paused) | admin toggle; paused companies are skipped by the scheduled scan |
 | last_crawl_at | TIMESTAMP NULLABLE | |
+
+### Subscription
+Join table — a user's set of subscriptions is their "my companies" list.
+| Column | Type | Notes |
+|---|---|---|
+| id | UUID (PK) | |
+| user_id | UUID (FK → User) | |
+| company_id | UUID (FK → Company) | |
+| created_at | TIMESTAMP | |
+
+UNIQUE(user_id, company_id)
 
 ### Job
 | Column | Type | Notes |
@@ -181,7 +219,7 @@ the migration.
 | id | UUID (PK) | |
 | job_id | UUID (FK → Job) | |
 | user_id | UUID (FK → User) | |
-| match_score | FLOAT | |
+| match_score | FLOAT | normalized 0.0–1.0; formatted as a percentage in the UI (PRD §5.3) |
 | missing_skills | JSONB | array of strings |
 | matching_experience_ids | JSONB | array of ExperienceSnippet ids |
 | recommendation | TEXT | |
@@ -198,6 +236,7 @@ UNIQUE(job_id, user_id)
 | company | TEXT | |
 | description | TEXT | |
 | technologies / achievements / metrics / tags | JSONB | arrays |
+| content_hash | TEXT | normalized hash of title+company+description; powers the duplicate-detection feature (PRD §5.4) — a near-match on insert warns the user rather than hard-blocking |
 | created_at / updated_at | TIMESTAMP | |
 
 ### Resume
@@ -252,14 +291,15 @@ UNIQUE(job_id, user_id)
 |---|---|---|
 | id | UUID (PK) | |
 | user_id | UUID (FK → User) | |
-| type | TEXT | |
+| type | TEXT | new_job / review_required / application_result / session_paused |
+| channel | ENUM(in_app, email) | MVP delivers in-app (always) + email (opt-out per PRD §5.10). Dispatched by a Celery task; push/SMS deferred to V2 |
 | payload | JSONB | |
 | read_at | TIMESTAMP NULLABLE | |
 | created_at | TIMESTAMP | |
 
-Relationships: `User 1—1 Profile`, `User 1—N ExperienceSnippet/Company`,
-`Company 1—N Job`, `Job 1—N JobMatch/Resume/Application`,
-`Application 1—1 BrowserSession`.
+Relationships: `User 1—1 Profile`, `User 1—N ExperienceSnippet`,
+`User N—M Company` (via `Subscription`), `Company 1—N Job` (global),
+`Job 1—N JobMatch/Resume/Application`, `Application 1—1 BrowserSession`.
 
 ---
 
@@ -285,6 +325,20 @@ so the business logic never depends on a specific browser runtime.
 ### State machine
 `Launch → Navigate → Fill → Verify → (repeat) → PendingReview → Submit → Complete`,
 with `Failed` and `PausedForUser` as side-states reachable from any step.
+
+The harness step, the persisted `BrowserSession.status`, and the user-facing
+`Application.status` are three layers describing the same lifecycle at
+different granularities. They map as follows — use these names consistently;
+they are not interchangeable synonyms:
+
+| Harness step | BrowserSession.status | Application.status |
+|---|---|---|
+| Launch / Navigate / Fill / Verify | `running` | `Applying` |
+| PendingReview | `paused_review` | `Waiting Review` |
+| (CAPTCHA hit) | `paused_captcha` | `Applying` |
+| (missing user input) | `paused_review` | `Waiting Review` |
+| Submit → Complete | `completed` | `Submitted` |
+| Failed | `failed` | `Failed` |
 
 ### Hard requirements (from PRD decisions)
 - **Human review is a mandatory, unconditional gate.** Every application
@@ -348,7 +402,7 @@ seek_passion/
 │   └── harness/        # Job Application Harness — Planning (uses packages/llm) + Playwright Execution
 ├── packages/
 │   ├── llm/             # Shared LLM provider abstraction (BYOM), used by ai_pipeline and harness
-│   └── shared/          # Shared types/schemas between web and api
+│   └── shared/          # TypeScript API types GENERATED from FastAPI's OpenAPI schema (see §8); consumed by web, never hand-edited
 └── docs/
     ├── PRD.md
     └── DESIGN.md
@@ -369,9 +423,10 @@ a local path dependency rather than a duplicated copy. `uv run` / `uv sync`
 per package during development.
 
 ### Node (`apps/web`)
-Managed with **pnpm**. Only one JS package today, so no workspace is needed
-yet — if `packages/shared` grows real TypeScript content later, this
-becomes a pnpm workspace.
+Managed with **pnpm**. `packages/shared` holds only the TypeScript types
+generated from the API's OpenAPI schema (below), so it isn't a hand-authored
+package; a pnpm workspace is introduced only if genuinely shared, hand-written
+TS code appears later.
 
 ### Keeping the API contract in sync
 The one real coupling point between the two toolchains: FastAPI's Pydantic
@@ -392,6 +447,25 @@ GitHub Actions with **path-filtered jobs**: changes under `apps/api/`,
 `workers/`, or `packages/llm/` trigger the Python job (ruff, mypy, pytest);
 changes under `apps/web/` trigger the Node job (eslint, tsc, build). A
 change to only one side doesn't run the other side's pipeline.
+
+### Testing strategy
+Per CLAUDE.md this is a test-driven codebase: every feature ships with
+integration tests, and the two hardest-to-test components need a deterministic
+approach so tests stay fast, free, and CI-safe:
+
+- **Harness / Playwright** — integration tests run the planning+execution loop
+  against **recorded static ATS form fixtures** (saved Greenhouse/Lever HTML),
+  not the live sites. This asserts the harness fills and navigates correctly
+  without hitting a real ATS, avoiding flakiness and ToS issues. The mandatory
+  review gate and CAPTCHA-pause paths (§5) each get an explicit test proving no
+  code path submits without review.
+- **LLM calls** — the `packages/llm` interface is mocked (or replays recorded
+  responses) in tests, so AI Pipeline and Browser Planning tests are
+  deterministic and incur no token cost. A small, separately-gated suite may
+  exercise real providers, kept out of the default CI run.
+- **Truthfulness** — the grounding/validation step (§3.4) is unit-tested with
+  fixtures that deliberately inject unsupported claims, asserting they are
+  flagged rather than passed through.
 
 ---
 
