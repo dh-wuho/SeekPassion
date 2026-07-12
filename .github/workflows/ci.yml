@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect relevant changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            api:
+              - 'apps/api/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+      - if: steps.changes.outputs.api == 'true'
+        uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.11.23"
+      - if: steps.changes.outputs.api == 'true'
+        run: uv sync
+      - if: steps.changes.outputs.api == 'true'
+        run: uv run ruff check apps/api
+      - if: steps.changes.outputs.api == 'true'
+        run: uv run --package seekpassion-api pytest apps/api/tests
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect relevant changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            web:
+              - 'apps/web/**'
+      - if: steps.changes.outputs.web == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - if: steps.changes.outputs.web == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - if: steps.changes.outputs.web == 'true'
+        working-directory: apps/web
+        run: pnpm install --frozen-lockfile
+      - if: steps.changes.outputs.web == 'true'
+        working-directory: apps/web
+        run: pnpm lint
+      - if: steps.changes.outputs.web == 'true'
+        working-directory: apps/web
+        run: pnpm exec tsc --noEmit
+      - if: steps.changes.outputs.web == 'true'
+        working-directory: apps/web
+        run: pnpm build

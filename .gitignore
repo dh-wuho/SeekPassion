@@ -1,1 +1,10 @@
 .claude/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.db
+.pytest_cache/
+.ruff_cache/
+
